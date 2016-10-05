@@ -4,6 +4,7 @@ import com.mongodb.spark._
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
 import org.bson.Document
+import org.apache.spark.sql.functions._
 
 /**
   * Created by NaranjO on 29/9/16.
@@ -40,9 +41,11 @@ object KB {
 
     val test = aggregatedRdd.toDF[Game]
     test.show()
-    val test2 = test.filter("month(date)=11")
+    val test2 = test.filter("year(date)<=2011").filter("month(date)=11").filter("day(date)>=15")
     println(test2.count)
     test2.show()
+    val test3 = test.sort(desc("date"))
+    test3.show()
 //    println(aggregatedRdd.count)
 //    println(aggregatedRdd.first.toJson)
 //    val test = aggregatedRdd.toDF()

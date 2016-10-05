@@ -1,3 +1,5 @@
+import CristuSpark._
+
 /**
   * Created by NaranjO on 29/9/16.
   */
@@ -76,7 +78,7 @@ object NewEmptyGame {
     println("Fecha del partido: (Formato: AÑO-MES-DÍA) ")
     val inputFecha = readLine()
     val fecha = inputFecha.split("-")
-    CristuSpark.prediccion(fecha, abbrLtmp,localPlayers, abbrVtmp, visitPlayers)
+    prediccion(fecha, abbrLtmp,localPlayers, abbrVtmp, visitPlayers)
 
     //crearPartido(fecha, abbrLtmp,localPlayers, abbrVtmp, visitPlayers)
   }
