@@ -1,5 +1,5 @@
-import CristuSpark._
-
+//import CristuSpark._
+import SparkFrontEnd._
 /**
   * Created by NaranjO on 29/9/16.
   */
@@ -9,8 +9,25 @@ object NewEmptyGame {
 
   def main(args: Array[String]) {
 
-    menu()
+    readFile()
+    //menu()
 
+  }
+  def readFile(): Unit = {
+    val source = scala.io.Source.fromFile("/Users/NaranjO/Documents/TFG/MEAN/predict.txt")
+    val lines = try source.mkString finally source.close()
+    println(lines)
+    val lineAr = lines.split("\n")
+    val abbrL = lineAr(0)
+    val abbrV = lineAr(1)
+    val localPlayers = lineAr(2).split(",")
+    val visitPlayers = lineAr(3).split(",")
+    val fecha = lineAr(4).split("-")
+    println(abbrL)
+    println(abbrV)
+    localPlayers.foreach(println)
+    visitPlayers.foreach(println)
+    prediccion(fecha, abbrL, localPlayers,abbrV, visitPlayers)
   }
 
   def menu(): Unit = {

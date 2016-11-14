@@ -1,22 +1,20 @@
+import java.io.{PrintWriter, FileWriter, File}
 import java.sql.Timestamp
-
+import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.{SparkContext, SparkConf}
 import com.mongodb.spark._
 import org.bson.Document
 import org.apache.spark.sql.functions._
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.mllib.regression.LabeledPoint
-import org.apache.spark.mllib.regression.LinearRegressionModel
-import org.apache.spark.mllib.regression.LinearRegressionWithSGD
+
 import scala.util.Try
-
 /**
-  * Created by NaranjO on 29/9/16.
+  * Created by NaranjO on 14/11/16.
   */
-
-object CristuSpark {
+object SparkFrontEnd {
 
   //Clases para quedarme solo con los puntos de cada jugador
   case class Jugadores(pts: Int)
@@ -49,60 +47,6 @@ object CristuSpark {
     resultVisitiantes.cache()
     resultLocales.take(30).foreach(println)
     resultVisitiantes.take(30).foreach(println)
-    //Predicciones para análisis
-    /*
-//    resultLocales.take(resultLocales.count().toInt).foreach(println)
-//    resultVisitiantes.take(resultVisitiantes.count().toInt).foreach(println)
-    //Filtro para cada jugador y covierto los datos en LabeledPoints
-    val localesAgrupados =resultLocales.groupByKey()
-    val localesLP = localesAgrupados.map(tuple => {
-      val player = tuple._1
-      val pts = tuple._2
-      var cont = 0.0
-      var arrayLBPts: Array[LabeledPoint] = Array()
-      for (elem <- pts){
-        val lpPts = LabeledPoint(cont, Vectors.dense(elem.toDouble))
-        arrayLBPts :+= lpPts
-        cont+=1
-        println(cont)
-      }
-      //arrayLBPts.foreach(println)
-      (player,sc.parallelize(arrayLBPts))
-    })
-    //Para cada LabeledPoint realizo la regresion linear
-    val dataModel = localesLP.map(tuple => {
-      val player = tuple._1
-      val parsedData = tuple._2
-      // Building the model
-      val numIterations = 100
-      val stepSize = 0.00000001
-      val splits = parsedData.randomSplit(Array(0.70,0.30))
-      val trainingData = splits(0)
-      val model = LinearRegressionWithSGD.train(trainingData, numIterations, stepSize)
-      (player,parsedData,model)
-    })
-    // Evaluate model on training examples and compute training error
-    val valuesAndPreds = dataModel.map(tuple=>{
-      val player = tuple._1
-      val parsedData = tuple._2
-      val model = tuple._3
-      val splits = parsedData.randomSplit(Array(0.70,0.30))
-      val testData = splits(1)
-      val values = testData.map(point => {
-        val prediction = model.predict(point.features)
-        (point.label,prediction)
-      })
-      (player, values)
-    })
-    val MSE = valuesAndPreds.map(tuple => {
-      val player = tuple._1
-      val values = tuple._2
-      val MSEp = values.map{case(v, p) => math.pow((v - p), 2)}.mean()
-      println("Player: " + player, "MSE: " + MSEp)
-      (player, MSEp)
-    })
-    MSE.take(MSE.count().toInt).foreach(println)
-    */
     //Prediccion para FrontEnd
     val localesAgrupados =resultLocales.groupByKey()
     val localesLP = localesAgrupados.map(tuple => {
@@ -117,7 +61,8 @@ object CristuSpark {
         //println(cont)
       }
       //arrayLBPts.foreach(println)
-      (player,sc.parallelize(arrayLBPts))
+      val dataFrame = sqlContext.createDataFrame(arrayLBPts)
+      (player,dataFrame)
     })
     localesLP.cache();
     localesLP.take(30).foreach(println)
@@ -127,10 +72,9 @@ object CristuSpark {
       val player = tuple._1
       val parsedData = tuple._2
       // Building the model
-      val numIterations = 100
-      val stepSize = 0.00000001
-      parsedData.take(30).foreach(println)
-      val model = LinearRegressionWithSGD.train(parsedData, numIterations, stepSize)
+      val linReg = new LinearRegression().setMaxIter(100).setFitIntercept(true)
+      val model = linReg.fit(parsedData)
+      //  train(parsedData, numIterations, stepSize)
       (player,parsedData,model)
     })
     dataModel.cache();
@@ -140,8 +84,8 @@ object CristuSpark {
       val player = tuple._1
       val parsedData = tuple._2
       val model = tuple._3
-      val predictData = LabeledPoint(0.0, Vectors.dense(parsedData.count().toDouble))
-      val prediction = model.predict(predictData.features)
+      //model.
+      val prediction = model.intercept + model.coefficients(0)*parsedData.count()
       (player,prediction)
     })
     valuesAndPreds.cache()
@@ -154,13 +98,14 @@ object CristuSpark {
       var cont = 0.0
       var arrayLBPtsV: Array[LabeledPoint] = Array()
       for (elem <- pts){
-        val lpPts = LabeledPoint(cont, Vectors.dense(elem.toDouble))
-        arrayLBPtsV :+= lpPts
+        val lpPtsV = LabeledPoint(elem.toDouble, Vectors.dense(cont))
+        arrayLBPtsV :+= lpPtsV
         cont+=1
         //println(cont)
       }
+      val dataFrameV = sqlContext.createDataFrame(arrayLBPtsV)
       //arrayLBPts.foreach(println)
-      (player,sc.parallelize(arrayLBPtsV))
+      (player,dataFrameV)
     })
     visitantesLP.cache();
     //visitantesLP.foreach(println)
@@ -169,9 +114,8 @@ object CristuSpark {
       val player = tuple._1
       val parsedData = tuple._2
       // Building the model
-      val numIterations = 100
-      val stepSize = 0.00000001
-      val model = LinearRegressionWithSGD.train(parsedData, numIterations, stepSize)
+      val linReg = new LinearRegression().setMaxIter(100).setFitIntercept(true)
+      val model = linReg.fit(parsedData)
       (player,parsedData,model)
     })
     dataModelV.cache()
@@ -180,15 +124,16 @@ object CristuSpark {
       val player = tuple._1
       val parsedData = tuple._2
       val model = tuple._3
-      val predictData = LabeledPoint(parsedData.count().toDouble, Vectors.dense(0.0))
-      val prediction = model.predict(predictData.features)
+      val prediction = model.intercept + model.coefficients(0)*parsedData.count()
       (player,prediction)
     })
     valuesAndPredsV.cache()
-    valuesAndPredsV.foreach(println)
+    valuesAndPredsV.take(30).foreach(println)
+
+    writeResults(valuesAndPreds,valuesAndPredsV)
 
     println("Saliendo de prediccion...")
-}
+  }
 
 
   def resultadosPrevios(fecha: Array[String],local: String, visitante: String, localPlayers: Array[String], visitPlayers: Array[String]): (RDD[(String, Int)], RDD[(String, Int)]) = {
@@ -202,7 +147,7 @@ object CristuSpark {
       var puntos: Array[Int] = Array()
       var player = localPlayers(i)
       println(player)
-      val rddJugador = CristuSpark.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
+      val rddJugador = SparkFrontEnd.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
         Document.parse("{$unwind: '$box'}"),
         Document.parse("{$match: {'box.players.player':" + "'" + player + "'" + "}}"),
         Document.parse("{$unwind: '$box.players'}"),
@@ -210,17 +155,17 @@ object CristuSpark {
       val dfJugador = rddJugador.toDF[Partido]
       dfJugador.cache()
       //dfJugador.printSchema()
-//      println(dfJugador.count)
-//      puntos.foreach(println)
+      //      println(dfJugador.count)
+      //      puntos.foreach(println)
       //Filtro para obtener los partidos anteriores contra ese equipo jugando como local
       val partidosVSVisitante = dfJugador.select("*").where(dfJugador("teams").getItem(1).getField("abbreviation") === visitante ) //Añadir condicion, puede estar en item 0
       val resultPlayer = partidosVSVisitante.select(partidosVSVisitante("box.players.pts"))
-        .map(puntos => (player,puntos.getInt(0)))
+          .map(puntos => (player,puntos.getInt(0)))
       val resultMesPlayer = resultadosMes(fecha, dfJugador,player)
       val resultMesHisto = resultadosMesHistorico(fecha,dfJugador,player)
-    /*  val totalResult = sqlContext.createDataFrame(resultPlayer ++ resultMesPlayer ++ resultMesHisto)
-        .withColumnRenamed("_1","player")
-        .withColumnRenamed("_2","puntos")*/
+      /*  val totalResult = sqlContext.createDataFrame(resultPlayer ++ resultMesPlayer ++ resultMesHisto)
+          .withColumnRenamed("_1","player")
+          .withColumnRenamed("_2","puntos")*/
       totalLocalResults = totalLocalResults ++ resultPlayer.collect() ++ resultMesPlayer.collect() ++ resultMesHisto.collect()
       println(totalLocalResults.length)
     }
@@ -229,7 +174,7 @@ object CristuSpark {
       var puntos: Array[Int] = Array()
       var player = visitPlayers(i)
       //println(player)
-      val rddJugador = CristuSpark.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
+      val rddJugador = SparkFrontEnd.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
         Document.parse("{$unwind: '$box'}"),
         Document.parse("{$match: {'box.players.player':" + "'" + player + "'" + "}}"),
         Document.parse("{$unwind: '$box.players'}"),
@@ -238,12 +183,12 @@ object CristuSpark {
       //Filtro para obtener los partidos anteriores contra ese equipo jugando como visitante
       val partidosVSLocal = dfJugador.select("*").where(dfJugador("teams").getItem(0).getField("abbreviation") === local )
       val resultPlayer = partidosVSLocal.select(partidosVSLocal("box.players.pts")).map(puntos => (player,puntos.getInt(0)))
-//      resultPlayer.take(20).foreach(println)
+      //      resultPlayer.take(20).foreach(println)
       val resultMesPlayer = resultadosMes(fecha, dfJugador,player)
       val resultMesHisto = resultadosMesHistorico(fecha,dfJugador,player)
-    /*  val totalResult = sqlContext.createDataFrame(resultPlayer ++ resultMesPlayer ++ resultMesHisto)
-        .withColumnRenamed("_1","player")
-        .withColumnRenamed("_2","puntos")*/
+      /*  val totalResult = sqlContext.createDataFrame(resultPlayer ++ resultMesPlayer ++ resultMesHisto)
+          .withColumnRenamed("_1","player")
+          .withColumnRenamed("_2","puntos")*/
       totalVisitResults = totalVisitResults ++ resultPlayer.collect() ++ resultMesPlayer.collect() ++ resultMesHisto.collect()
       println(totalVisitResults.length)
     }
@@ -291,8 +236,23 @@ object CristuSpark {
       .map(puntos => (player,puntos.getInt(0)))
     resultHistorico
   }
-
-  def main(args: Array[String]) {
-
+  def writeResults(local:RDD[(String,Double)] , visit:RDD[(String,Double)] ): Unit = {
+    val file = new File("/Users/NaranjO/Documents/TFG/MEAN/predictions.txt")
+    val fw = new FileWriter(file);
+    val pw = new PrintWriter(fw);
+    local.take(20).foreach(tuple => {
+      val player = tuple._1
+      val pts = tuple._2
+      val data = player + "-" + pts.toString + "\n"
+      pw.write(data)
+    })
+    visit.take(20).foreach(tuple => {
+      val player = tuple._1
+      val pts = tuple._2
+      val data = player + "-" + pts.toString + "\n"
+      pw.write(data)
+    })
+    pw.close()
   }
+
 }
