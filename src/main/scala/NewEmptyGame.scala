@@ -1,5 +1,8 @@
 //import CristuSpark._
 import SparkFrontEnd._
+//import SparkAnalysis1._
+//import SparkAnalysis2._
+//import SparkAnalysisGlobal._
 /**
   * Created by NaranjO on 29/9/16.
   */
@@ -14,7 +17,8 @@ object NewEmptyGame {
 
   }
   def readFile(): Unit = {
-    val source = scala.io.Source.fromFile("/Users/NaranjO/Documents/TFG/MEAN/predict.txt")
+    //val source = scala.io.Source.fromFile("/Users/NaranjO/Documents/TFG/MEAN/predict.txt")
+    val source = scala.io.Source.fromFile("predict.txt")
     val lines = try source.mkString finally source.close()
     println(lines)
     val lineAr = lines.split("\n")

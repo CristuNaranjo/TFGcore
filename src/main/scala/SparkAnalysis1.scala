@@ -13,7 +13,7 @@ import org.apache.spark.sql.functions._
 /**
   * Created by NaranjO.
   */
-object SparkFrontEnd {
+object SparkAnalysis1 {
   //Clases para quedarme solo con los puntos de cada jugador
   case class Jugadores(pts: Int)
 
@@ -62,15 +62,12 @@ object SparkFrontEnd {
     val dataModelLocal = localesLP.map(tuple => {
       val player = tuple._1
       val parsedData = tuple._2
-      val splits = parsedData.randomSplit(Array(0.7,0.3))
-      val trainingData = splits(0)
-      val evalData = splits(1)
       var i = 0
       val linReg = new LinearRegression().setMaxIter(100).setFitIntercept(true)
-      var finalModel = linReg.fit(trainingData)
+      var finalModel = linReg.fit(parsedData)
       var finalSummary = finalModel.summary
 
-      /*while(i<100){
+      while(i<100){
         val splits = parsedData.randomSplit(Array(0.7,0.3))
         // Building the model
         val trainingData = splits(0)
@@ -82,7 +79,7 @@ object SparkFrontEnd {
           finalSummary = trModel
         }
         i+=1
-      }*/
+      }
       /*
       val splits = parsedData.randomSplit(Array(0.7,0.3))
       // Building the model
@@ -128,15 +125,12 @@ object SparkFrontEnd {
     val dataModelVisitante = visitantesLP.map(tuple => {
       val player = tuple._1
       val parsedData = tuple._2
-      val splits = parsedData.randomSplit(Array(0.7,0.3))
-      val trainingData = splits(0)
-      val evalData = splits(1)
       var i = 0
       val linReg = new LinearRegression().setMaxIter(100).setFitIntercept(true)
-      var finalModel = linReg.fit(trainingData)
+      var finalModel = linReg.fit(parsedData)
       var finalSummary = finalModel.summary
 
-      /*while (i < 100) {
+      while (i < 100) {
         val splits = parsedData.randomSplit(Array(0.7, 0.3))
         // Building the model
         val trainingData = splits(0)
@@ -148,7 +142,7 @@ object SparkFrontEnd {
           finalSummary = trModel
         }
         i += 1
-      }*/
+      }
       (player, parsedData, finalModel, parsedData)
     })
     val dataPredictionVisitante = dataModelVisitante.map(tuple=>{
@@ -177,9 +171,9 @@ object SparkFrontEnd {
     //Locales
     for (i <- 0 until localPlayers.length) {
       var puntos: Array[Int] = Array()
-      var player = localPlayers(i).toString
+      var player = localPlayers(i)
       println(player)
-      val rddJugador = SparkFrontEnd.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
+      val rddJugador = SparkAnalysis1.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
         Document.parse("{$unwind: '$box'}"),
         Document.parse("{$match: {'box.players.player':" + "'" + player + "'" + "}}"),
         Document.parse("{$unwind: '$box.players'}"),
@@ -188,16 +182,16 @@ object SparkFrontEnd {
       dfJugador.cache()
       val resultadosLocales = dfJugador.select(dfJugador("box.players.pts"))
         .map(puntos => (player,puntos.getInt(0)))
-      //.map(puntos => (player,puntos.getInt(0),player))
+          //.map(puntos => (player,puntos.getInt(0),player))
       //resultadosLocales.take(resultadosLocales.count().toInt).foreach(println)
       totalLocalResults = totalLocalResults ++ resultadosLocales.collect()
     }
     //Visitantes
     for (i <- 0 until visitPlayers.length) {
       var puntos: Array[Int] = Array()
-      var player = visitPlayers(i).toString
-      println(player)
-      val rddJugador = SparkFrontEnd.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
+      var player = visitPlayers(i)
+      //println(player)
+      val rddJugador = SparkAnalysis1.rdd.withPipeline(Seq(Document.parse("{$match: { 'box.players.player': " + "'" + player + "'" + " }}"),
         Document.parse("{$unwind: '$box'}"),
         Document.parse("{$match: {'box.players.player':" + "'" + player + "'" + "}}"),
         Document.parse("{$unwind: '$box.players'}"),
@@ -205,8 +199,8 @@ object SparkFrontEnd {
       val dfJugador = rddJugador.toDF[Partido]
       dfJugador.cache()
       val resultadosVisitantes = dfJugador.select(dfJugador("box.players.pts"))
-        .map(puntos=> (player,puntos.getInt(0)))
-      //.map(puntos => (player,puntos.getInt(0),player))
+          .map(puntos=> (player,puntos.getInt(0)))
+        //.map(puntos => (player,puntos.getInt(0),player))
       //resultadosVisitantes.take(resultadosVisitantes.count().toInt).foreach(println)
       totalVisitResults = totalVisitResults ++ resultadosVisitantes.collect()
     }
@@ -219,7 +213,6 @@ object SparkFrontEnd {
     val file = new File("/Users/NaranjO/Documents/TFG/MEAN/predictions.txt")
     val fw = new FileWriter(file);
     val pw = new PrintWriter(fw);
-    var finalData = "";
     local.take(20).foreach(tuple => {
       val player = tuple._1
       val ECM = tuple._2
@@ -227,21 +220,18 @@ object SparkFrontEnd {
       val pts = tuple._4
       //val data = player + "//" + ECM.toString + "//" + R2.toString + "//" + pts.toString + "\n"
       val data = player + "/"  + pts.toString + "\n"
-      finalData += player + "/"  + pts.toString + "\n"
-      //pw.write(data)
+      pw.write(data)
     })
-    //pw.write("\n")
+    pw.write("\n")
     visit.take(20).foreach(tuple => {
       val player = tuple._1
       val ECM = tuple._2
       val R2 = tuple._3
       val pts = tuple._4
       val data = player + "/"  + pts.toString + "\n"
-      finalData += player + "/"  + pts.toString + "\n"
       //val data = player + "//" + ECM.toString + "//" + R2.toString + "//" + pts.toString + "\n"
-      //pw.write(data)
+      pw.write(data)
     })
-    pw.write(finalData)
     pw.close()
   }
 
